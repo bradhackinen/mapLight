@@ -2,6 +2,7 @@ import os
 import requests
 import json
 
+
 from mapLight.dirs import *
 from mapLight.key import apiKey
 
@@ -22,15 +23,35 @@ def downloadBills(jurisdiction,session,includePositions=True,allBills=False):
     return result.json()['bills']
 
 
+
 if __name__ == '__main__':
     if not os.path.isdir(positionsDir):
         os.makedirs(positionsDir)
 
-    jurisdiction = 'us'
     # Download all sessions of congress
+    jurisdiction = 'us'
     for session in range(109,116):
         print('downloading {} session {}'.format(jurisdiction,session))
         bills = downloadBills(jurisdiction='us',session=session)
 
         with open(os.path.join(positionsDir,'{}_{}.json'.format(jurisdiction,session)),'w',encoding='utf8') as f:
             json.dump(bills,f)
+
+
+    # Compile positions.csv
+    import pandas as pd
+
+    billDFs = []
+    for jsonFile in [f for f in os.listdir(positionsDir) if f.endswith('.json')]:
+        with open(os.path.join(positionsDir,jsonFile),'r',encoding='utf8') as f:
+            bills = json.load(f)
+
+        for bill in bills:
+            df = pd.DataFrame(bill['organizations'])
+            for c in [k for k in bill.keys() if k != 'organizations']:
+                df[c] = bill[c]
+            billDFs.append(df)
+
+    positionsDF = pd.concat(billDFs)
+
+    positionsDF.to_csv(os.path.join(dataDir,'positions.csv'),encoding='utf8',index=False)
